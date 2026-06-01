@@ -1,0 +1,94 @@
+체결/주문 알림
+심볼: BTC/USDT
+액션: SELL SHORT
+사유: breakdown_then_vwap_retest
+가격: 73984.80407424534
+수량: 0.025343042040341112
+주문ID: paper-1
+체결/주문 알림
+심볼: ETH/USDT
+액션: SELL SHORT
+사유: breakdown_then_vwap_retest
+가격: 2026.246352485652
+수량: 0.925356385071285
+주문ID: paper-2
+[
+  {
+    "symbol": "BTC/USDT",
+    "signal": {
+      "action": "SELL",
+      "symbol": "BTC/USDT",
+      "side": "SHORT",
+      "reason": "breakdown_then_vwap_retest",
+      "price": 73984.80407424534,
+      "qty_fraction": 1.0,
+      "a_plus": true,
+      "position_size_multiplier": 1.5,
+      "meta": {
+        "vwap": 73984.80407424534,
+        "ema8": 73905.73942741923,
+        "levels": {
+          "pre_high": 74246.1,
+          "pre_low": 73800.0,
+          "prior_high": 74025.3,
+          "prior_low": 73740.4
+        }
+      }
+    },
+    "order": {
+      "id": "paper-1",
+      "symbol": "BTC/USDT",
+      "side": "Sell",
+      "qty": 0.025343042040341112,
+      "type": "Limit",
+      "price": 73984.80407424534,
+      "reduce_only": false,
+      "timestamp": "2026-05-31T12:54:49.695841+00:00"
+    },
+    "levels": {
+      "pre_high": 74246.1,
+      "pre_low": 73800.0,
+      "prior_high": 74025.3,
+      "prior_low": 73740.4
+    }
+  },
+  {
+    "symbol": "ETH/USDT",
+    "signal": {
+      "action": "SELL",
+      "symbol": "ETH/USDT",
+      "side": "SHORT",
+      "reason": "breakdown_then_vwap_retest",
+      "price": 2026.246352485652,
+      "qty_fraction": 1.0,
+      "a_plus": true,
+      "position_size_multiplier": 1.5,
+      "meta": {
+        "vwap": 2026.246352485652,
+        "ema8": 2022.175910743864,
+        "levels": {
+          "pre_high": 2037.78,
+          "pre_low": 2019.31,
+          "prior_high": 2030.77,
+          "prior_low": 2018.91
+        }
+      }
+    },
+    "order": {
+      "id": "paper-2",
+      "symbol": "ETH/USDT",
+      "side": "Sell",
+      "qty": 0.925356385071285,
+      "type": "Limit",
+      "price": 2026.246352485652,
+      "reduce_only": false,
+      "timestamp": "2026-05-31T12:54:49.888325+00:00"
+    },
+    "levels": {
+      "pre_high": 2037.78,
+      "pre_low": 2019.31,
+      "prior_high": 2030.77,
+      "prior_low": 2018.91
+    }
+  }
+]

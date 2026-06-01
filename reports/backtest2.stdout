@@ -1,0 +1,129 @@
+{
+  "BTC/USDT": {
+    "symbol": "BTC/USDT",
+    "initial_equity": 1000.0,
+    "equity": 1000.926221,
+    "pnl": 0.926221,
+    "trades": 6,
+    "orders": [
+      {
+        "action": "SELL",
+        "side": "SHORT",
+        "qty": 0.005071042144174122,
+        "price": 73949.29668072659,
+        "reason": "breakdown_then_vwap_retest",
+        "a_plus": true
+      },
+      {
+        "action": "CLOSE",
+        "side": "SHORT",
+        "qty": 0.005071042144174122,
+        "price": 73944.4,
+        "pnl": 0.02483127433113839,
+        "reason": "vwap_stop_loss"
+      },
+      {
+        "action": "SELL",
+        "side": "SHORT",
+        "qty": 0.0050745038244073394,
+        "price": 73900.68560479846,
+        "reason": "breakdown_then_vwap_retest",
+        "a_plus": true
+      },
+      {
+        "action": "CLOSE",
+        "side": "SHORT",
+        "qty": 0.0050745038244073394,
+        "price": 73991.5,
+        "pnl": -0.4608379957614441,
+        "reason": "vwap_stop_loss"
+      },
+      {
+        "action": "SELL",
+        "side": "SHORT",
+        "qty": 0.005061628370550415,
+        "price": 74054.52752326478,
+        "reason": "breakdown_then_vwap_retest",
+        "a_plus": true
+      },
+      {
+        "action": "CLOSE",
+        "side": "SHORT",
+        "qty": 0.005061628370550415,
+        "price": 74080.1,
+        "pnl": -0.1294383737482409,
+        "reason": "vwap_stop_loss"
+      },
+      {
+        "action": "SELL",
+        "side": "SHORT",
+        "qty": 0.005060900505944336,
+        "price": 74055.58707370293,
+        "reason": "breakdown_then_vwap_retest",
+        "a_plus": true
+      },
+      {
+        "action": "CLOSE",
+        "side": "SHORT",
+        "qty": 0.005060900505944336,
+        "price": 74061.1,
+        "pnl": -0.027900371486091268,
+        "reason": "vwap_stop_loss"
+      },
+      {
+        "action": "SELL",
+        "side": "SHORT",
+        "qty": 0.005059840623826924,
+        "price": 74069.03167763102,
+        "reason": "breakdown_then_vwap_retest",
+        "a_plus": true
+      },
+      {
+        "action": "CLOSE",
+        "side": "SHORT",
+        "qty": 0.005059840623826924,
+        "price": 74060.1,
+        "pnl": 0.045192865316336886,
+        "reason": "vwap_stop_loss"
+      },
+      {
+        "action": "SELL",
+        "side": "SHORT",
+        "qty": 0.005059915624954294,
+        "price": 74071.28311114474,
+        "reason": "breakdown_then_vwap_retest",
+        "a_plus": true
+      },
+      {
+        "action": "CLOSE",
+        "side": "SHORT",
+        "qty": 0.005059915624954294,
+        "price": 73779.9,
+        "pnl": 1.4743739569291179,
+        "reason": "end_of_backtest"
+      }
+    ],
+    "config": {
+      "risk": {
+        "risk_per_trade_pct": 0.005,
+        "max_notional_pct": 0.25,
+        "min_qty": 0.0
+      }
+    }
+  },
+  "ETH/USDT": {
+    "symbol": "ETH/USDT",
+    "initial_equity": 1000.0,
+    "equity": 1000.0,
+    "pnl": 0.0,
+    "trades": 0,
+    "orders": [],
+    "config": {
+      "risk": {
+        "risk_per_trade_pct": 0.005,
+        "max_notional_pct": 0.25,
+        "min_qty": 0.0
+      }
+    }
+  }
+}

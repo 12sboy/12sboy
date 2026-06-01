@@ -1,0 +1,219 @@
+{
+  "generated_at": "2026-05-31T10:52:20.558167+00:00",
+  "assumptions": {
+    "initial_equity_per_symbol": 1000.0,
+    "timeframe": "5m",
+    "lookback_days": 730,
+    "fees_slippage": "not included",
+    "position_sizing": {
+      "risk_per_trade_pct": 0.005,
+      "max_notional_pct": 0.25
+    }
+  },
+  "combined": {
+    "initial_equity_note": "총 자본 2000 USDT를 BTC/USDT 1000, ETH/USDT 1000으로 균등 배분한 독립 백테스트. combined는 단순 합산.",
+    "total_initial_equity": 2000.0,
+    "total_final_equity": 4475.267604,
+    "total_net_pnl": 2475.267604,
+    "total_return_pct": 123.7634,
+    "total_trades": 2943,
+    "total_wins": 1002,
+    "total_losses": 1941,
+    "win_rate_pct": 34.05,
+    "gross_profit": 3566.763852,
+    "gross_loss": -1091.496249,
+    "profit_factor": 3.2678
+  },
+  "symbols": {
+    "BTC/USDT": {
+      "symbol": "BTC/USDT",
+      "period": {
+        "start": "2024-05-31T10:55:00+00:00",
+        "end": "2026-05-31T10:50:00+00:00",
+        "candles": 210240,
+        "timeframe": "5m"
+      },
+      "initial_equity": 1000.0,
+      "final_equity": 2008.993084,
+      "net_pnl": 1008.993084,
+      "net_return_pct": 100.8993,
+      "trades": 1517,
+      "wins": 537,
+      "losses": 980,
+      "breakeven": 0,
+      "win_rate_pct": 35.4,
+      "gross_profit": 1451.898679,
+      "gross_loss": -442.905595,
+      "profit_factor": 3.2781,
+      "avg_win": 2.703722,
+      "avg_loss": -0.451944,
+      "largest_win": 66.012568,
+      "largest_loss": -6.488535,
+      "max_drawdown_usdt": -21.170399,
+      "max_drawdown_pct_initial": -2.117,
+      "a_plus_trades": 863,
+      "long_trades": 774,
+      "short_trades": 743,
+      "sample_trades": [
+        {
+          "symbol": "BTC/USDT",
+          "side": "LONG",
+          "entry_time": "2024-06-01T12:55:00+00:00",
+          "entry_price": 67693.60913229147,
+          "initial_qty": 0.00553966622265847,
+          "a_plus": true,
+          "exits": [
+            {
+              "time": "2024-06-01T15:55:00+00:00",
+              "price": 67708.9,
+              "qty": 0.00553966622265847,
+              "pnl": 0.08470630336003593,
+              "reason": "vwap_stop_loss"
+            }
+          ],
+          "exit_time": "2024-06-01T15:55:00+00:00",
+          "exit_price": 67708.9,
+          "pnl": 0.08470630336003593,
+          "return_pct_on_initial_equity": 0.008470630336003593
+        },
+        {
+          "symbol": "BTC/USDT",
+          "side": "LONG",
+          "entry_time": "2024-06-01T21:50:00+00:00",
+          "entry_price": 67720.27728243337,
+          "initial_qty": 0.005537953769735128,
+          "a_plus": true,
+          "exits": [
+            {
+              "time": "2024-06-02T00:05:00+00:00",
+              "price": 67791.5,
+              "qty": 0.005537953769735128,
+              "pnl": 0.3944281172389208,
+              "reason": "vwap_stop_loss"
+            }
+          ],
+          "exit_time": "2024-06-02T00:05:00+00:00",
+          "exit_price": 67791.5,
+          "pnl": 0.3944281172389208,
+          "return_pct_on_initial_equity": 0.03944281172389208
+        },
+        {
+          "symbol": "BTC/USDT",
+          "side": "SHORT",
+          "entry_time": "2024-06-02T11:20:00+00:00",
+          "entry_price": 67692.13557445853,
+          "initial_qty": 0.0055424411155568076,
+          "a_plus": true,
+          "exits": [
+            {
+              "time": "2024-06-02T11:35:00+00:00",
+              "price": 67690.8,
+              "qty": 0.0055424411155568076,
+              "pnl": 0.007402342791832245,
+              "reason": "vwap_stop_loss"
+            }
+          ],
+          "exit_time": "2024-06-02T11:35:00+00:00",
+          "exit_price": 67690.8,
+          "pnl": 0.007402342791832245,
+          "return_pct_on_initial_equity": 0.0007402342791832245
+        }
+      ]
+    },
+    "ETH/USDT": {
+      "symbol": "ETH/USDT",
+      "period": {
+        "start": "2024-05-31T10:55:00+00:00",
+        "end": "2026-05-31T10:50:00+00:00",
+        "candles": 210240,
+        "timeframe": "5m"
+      },
+      "initial_equity": 1000.0,
+      "final_equity": 2466.27452,
+      "net_pnl": 1466.27452,
+      "net_return_pct": 146.6275,
+      "trades": 1426,
+      "wins": 465,
+      "losses": 961,
+      "breakeven": 0,
+      "win_rate_pct": 32.61,
+      "gross_profit": 2114.865173,
+      "gross_loss": -648.590654,
+      "profit_factor": 3.2607,
+      "avg_win": 4.548097,
+      "avg_loss": -0.674912,
+      "largest_win": 51.142328,
+      "largest_loss": -10.791592,
+      "max_drawdown_usdt": -33.191241,
+      "max_drawdown_pct_initial": -3.3191,
+      "a_plus_trades": 532,
+      "long_trades": 727,
+      "short_trades": 699,
+      "sample_trades": [
+        {
+          "symbol": "ETH/USDT",
+          "side": "LONG",
+          "entry_time": "2024-06-01T10:40:00+00:00",
+          "entry_price": 3783.894359749478,
+          "initial_qty": 0.06606949777967688,
+          "a_plus": false,
+          "exits": [
+            {
+              "time": "2024-06-02T00:05:00+00:00",
+              "price": 3817.57,
+              "qty": 0.06606949777967688,
+              "pnl": 2.224932638761065,
+              "reason": "vwap_stop_loss"
+            }
+          ],
+          "exit_time": "2024-06-02T00:05:00+00:00",
+          "exit_price": 3817.57,
+          "pnl": 2.224932638761065,
+          "return_pct_on_initial_equity": 0.22249326387610646
+        },
+        {
+          "symbol": "ETH/USDT",
+          "side": "SHORT",
+          "entry_time": "2024-06-02T12:00:00+00:00",
+          "entry_price": 3803.60693173046,
+          "initial_qty": 0.09880998654310179,
+          "a_plus": true,
+          "exits": [
+            {
+              "time": "2024-06-02T13:50:00+00:00",
+              "price": 3802.67,
+              "qty": 0.09880998654310179,
+              "pnl": 0.09257821167855236,
+              "reason": "vwap_stop_loss"
+            }
+          ],
+          "exit_time": "2024-06-02T13:50:00+00:00",
+          "exit_price": 3802.67,
+          "pnl": 0.09257821167855236,
+          "return_pct_on_initial_equity": 0.009257821167855236
+        },
+        {
+          "symbol": "ETH/USDT",
+          "side": "SHORT",
+          "entry_time": "2024-06-02T20:55:00+00:00",
+          "entry_price": 3795.2144475051864,
+          "initial_qty": 0.09903763588800504,
+          "a_plus": true,
+          "exits": [
+            {
+              "time": "2024-06-02T22:30:00+00:00",
+              "price": 3797.78,
+              "qty": 0.09903763588800504,
+              "pnl": -0.25408625383293215,
+              "reason": "vwap_stop_loss"
+            }
+          ],
+          "exit_time": "2024-06-02T22:30:00+00:00",
+          "exit_price": 3797.78,
+          "pnl": -0.25408625383293215,
+          "return_pct_on_initial_equity": -0.025408625383293214
+        }
+      ]
+    }
+  }
+}

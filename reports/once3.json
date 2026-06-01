@@ -1,0 +1,48 @@
+[
+  {
+    "symbol": "BTC/USDT",
+    "signal": {
+      "action": "HOLD",
+      "symbol": "BTC/USDT",
+      "side": null,
+      "reason": "no_setup",
+      "price": null,
+      "qty_fraction": 1.0,
+      "a_plus": false,
+      "position_size_multiplier": 1.0,
+      "meta": {
+        "vwap": 73995.51240132295,
+        "ema8": 73802.68580389599
+      }
+    },
+    "levels": {
+      "pre_high": 74246.1,
+      "pre_low": 73800.0,
+      "prior_high": 74117.7,
+      "prior_low": 73740.4
+    }
+  },
+  {
+    "symbol": "ETH/USDT",
+    "signal": {
+      "action": "HOLD",
+      "symbol": "ETH/USDT",
+      "side": null,
+      "reason": "no_setup",
+      "price": null,
+      "qty_fraction": 1.0,
+      "a_plus": false,
+      "position_size_multiplier": 1.0,
+      "meta": {
+        "vwap": 2027.0340878118254,
+        "ema8": 2018.3326479064037
+      }
+    },
+    "levels": {
+      "pre_high": 2037.78,
+      "pre_low": 2019.31,
+      "prior_high": 2030.77,
+      "prior_low": 2018.91
+    }
+  }
+]

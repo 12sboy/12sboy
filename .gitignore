@@ -1,0 +1,24 @@
+# Secrets / credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Runtime state
+logs/
+run/
+tmp/
+reports/telegram_update_offset.txt
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/

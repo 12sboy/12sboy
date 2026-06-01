@@ -1,0 +1,30 @@
+# 기본은 안전한 paper 모드입니다.
+# Bybit 데모트레이딩 실주문 테스트 시 mode를 demo로 변경하고 .env에 키를 넣으세요.
+mode: paper
+symbols:
+  - BTC/USDT
+  - ETH/USDT
+timeframe: 5m
+equity_usdt: 1000
+order_type: Limit
+loop_interval_sec: 60
+hourly_report: true
+telegram:
+  # 비워두면 TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID 환경변수를 사용합니다.
+  token:
+  chat_id:
+strategy:
+  ema_length: 8
+  retest_tolerance_pct: 0.002
+  a_plus_alignment_pct: 0.003
+  a_plus_size_multiplier: 1.5
+  normal_size_multiplier: 1.0
+  ema_space_take_profit_pct: 0.025
+  take_profit_fraction: 0.5
+  fixed_take_profit_pct: 0.0025
+  require_candle_direction: true
+risk:
+  risk_per_trade_pct: 0.005
+  max_notional_pct: 0.25
+  min_qty: 0.0
+  leverage: 5
