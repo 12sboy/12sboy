@@ -17,6 +17,13 @@ from .notifier import Notifier, TelegramNotifier, make_notifier
 from .reporting import format_hourly_report, format_trade_message, market_snapshot
 from .risk import RiskConfig, calculate_order_qty
 from .scheduler import HourlyGate
+from .trade_monitor import (
+    MonitorState,
+    compute_pnl_stats,
+    format_close_fill,
+    format_entry_fill,
+    format_period_stats,
+)
 
 
 @dataclass(frozen=True)
@@ -87,6 +94,11 @@ class TradingBot:
         self._last_entry_candle: dict[str, tuple[datetime, str, str | None]] = {}
         self._last_error_notice_at: datetime | None = None
         self._last_error_notice_text: str | None = None
+        self._monitor_state_path = Path("reports/trade_monitor_state.json")
+        self._monitor_seeded = self._monitor_state_path.exists()
+        self._monitor_state = MonitorState.load(self._monitor_state_path)
+        self._last_daily_report_date = None
+        self._last_weekly_report_key = None
 
     def _notify_safe(self, text: str) -> bool:
         try:
@@ -113,6 +125,103 @@ class TradingBot:
         if self._notify_safe(text):
             self._last_error_notice_at = now
             self._last_error_notice_text = text
+
+    def _record_order_intent(self, symbol: str, order: dict, intent: str, direction: str, reason: str | None = None, entry_price: float | None = None) -> None:
+        order_id = order.get("orderId") or order.get("id")
+        if not order_id:
+            return
+        self._monitor_state.order_intents[str(order_id)] = {
+            "symbol": symbol,
+            "intent": intent,
+            "direction": direction,
+            "reason": reason,
+            "entry_price": entry_price,
+            "leverage": self.config.risk.leverage,
+            "stop_loss": bool(reason and "stop_loss" in reason),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        self._monitor_state.save(self._monitor_state_path)
+
+    def _fetch_recent_closed_pnl_rows(self, limit: int = 50) -> list[dict]:
+        fetch_closed_pnl = getattr(self.exchange, "fetch_closed_pnl", None)
+        if not callable(fetch_closed_pnl):
+            return []
+        rows: list[dict] = []
+        for symbol in self.config.symbols:
+            rows.extend(fetch_closed_pnl(symbol, limit=limit))
+        return rows
+
+    def poll_trade_monitoring(self) -> int:
+        """Send Telegram messages for newly observed fills and close-PnL rows."""
+        fetch_executions = getattr(self.exchange, "fetch_executions", None)
+        if not callable(fetch_executions):
+            return 0
+        closed_rows = self._fetch_recent_closed_pnl_rows(limit=50)
+        if not self._monitor_seeded:
+            for row in closed_rows:
+                order_id = str(row.get("orderId") or "")
+                if order_id:
+                    self._monitor_state.seen_closed_order_ids.add(order_id)
+            for symbol in self.config.symbols:
+                for exec_ in fetch_executions(symbol, limit=30):
+                    exec_id = str(exec_.get("execId") or "")
+                    if exec_id:
+                        self._monitor_state.seen_exec_ids.add(exec_id)
+            self._monitor_seeded = True
+            self._monitor_state.save(self._monitor_state_path)
+            return 0
+        closed_by_order = {str(r.get("orderId")): r for r in closed_rows if r.get("orderId")}
+        sent = 0
+        for symbol in self.config.symbols:
+            executions = list(reversed(fetch_executions(symbol, limit=30)))
+            for exec_ in executions:
+                exec_id = str(exec_.get("execId") or "")
+                if not exec_id or exec_id in self._monitor_state.seen_exec_ids:
+                    continue
+                order_id = str(exec_.get("orderId") or "")
+                intent = self._monitor_state.order_intents.get(order_id)
+                closed = closed_by_order.get(order_id)
+                closed_size = float(exec_.get("closedSize") or 0)
+                if closed or closed_size > 0 or (intent and intent.get("intent") == "close"):
+                    if closed:
+                        self._notify_safe(format_close_fill(closed, intent))
+                        self._monitor_state.seen_closed_order_ids.add(order_id)
+                    else:
+                        self._notify_safe(
+                            f"[청산 체결 감지]\n심볼: {exec_.get('symbol')}\n청산가: {exec_.get('execPrice')}\n물량: {exec_.get('execQty')}\n주문ID: {order_id}\n실현손익: Bybit closed-pnl 반영 대기"
+                        )
+                    sent += 1
+                else:
+                    self._notify_safe(format_entry_fill(exec_, intent, self.config.risk.leverage))
+                    sent += 1
+                self._monitor_state.seen_exec_ids.add(exec_id)
+        # If a close-pnl row appears without a fresh execution row, still report it.
+        for order_id, closed in closed_by_order.items():
+            if order_id in self._monitor_state.seen_closed_order_ids:
+                continue
+            intent = self._monitor_state.order_intents.get(order_id)
+            self._notify_safe(format_close_fill(closed, intent))
+            self._monitor_state.seen_closed_order_ids.add(order_id)
+            sent += 1
+        if sent:
+            self._monitor_state.save(self._monitor_state_path)
+        return sent
+
+    def build_period_report(self, title: str, since: datetime) -> str:
+        balance = self.exchange.fetch_balance()
+        equity = float((balance.get("USDT") or {}).get("equity") or self.config.equity_usdt)
+        stats = compute_pnl_stats(self._fetch_recent_closed_pnl_rows(limit=100), since=since, starting_equity=equity)
+        return format_period_stats(title, stats)
+
+    def build_daily_report(self) -> str:
+        now = datetime.now(timezone.utc)
+        since = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        return self.build_period_report("일간 손익 리포트", since)
+
+    def build_weekly_report(self) -> str:
+        now = datetime.now(timezone.utc)
+        since = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+        return self.build_period_report("주간 손익 리포트", since)
 
     def _sync_exchange_position(self, symbol: str) -> Position | None:
         fetch_positions = getattr(self.exchange, "fetch_positions", None)
@@ -194,6 +303,7 @@ class TradingBot:
                 if signal.action in ("TAKE_PROFIT", "CLOSE"):
                     qty = position.qty * signal.qty_fraction if signal.action == "TAKE_PROFIT" else position.qty
                     order = self.exchange.place_order(symbol, _close_side(position.side), qty, order_type="Market", reduce_only=True, position_idx=_position_idx_for_position(position.side))
+                    self._record_order_intent(symbol, order, "close", position.side, signal.reason, position.entry_price)
                     events.append({"symbol": symbol, "signal": asdict(signal), "order": order})
                     self._notify_safe(format_trade_message(events[-1]))
                     if signal.action == "TAKE_PROFIT":
@@ -221,6 +331,7 @@ class TradingBot:
                 qty = calculate_order_qty(self.config.equity_usdt, entry, stop if stop != entry else cur.low, self.config.risk) * signal.position_size_multiplier
                 if qty > 0:
                     order = self.exchange.place_order(symbol, "Buy" if signal.side == "LONG" else "Sell", qty, order_type=self.config.order_type, price=entry)
+                    self._record_order_intent(symbol, order, "entry", signal.side, signal.reason, entry)
                     self._last_entry_candle[symbol] = signature
                     if self.config.order_type.lower() == "market":
                         self.positions[symbol] = Position(symbol, signal.side, qty, entry)
@@ -246,7 +357,36 @@ class TradingBot:
                 self._sync_exchange_position(symbol)
             except Exception:
                 pass
-        return format_hourly_report(snapshots, balance, self.positions)
+        return format_hourly_report(snapshots, balance, self.positions) + "\n" + self._format_monitoring_pnl_lines(timedelta(hours=1))
+
+    def _format_monitoring_pnl_lines(self, period: timedelta) -> str:
+        try:
+            balance = self.exchange.fetch_balance()
+            equity = float((balance.get("USDT") or {}).get("equity") or self.config.equity_usdt)
+        except Exception:
+            equity = self.config.equity_usdt
+        since = datetime.now(timezone.utc) - period
+        stats = compute_pnl_stats(self._fetch_recent_closed_pnl_rows(limit=100), since=since, starting_equity=equity)
+        lines = [
+            f"최근 {int(period.total_seconds()//3600) or 1}시간 실현손익: {stats.realized_pnl:+.2f} USDT ({stats.realized_pct:+.1f}%)",
+            f"승률: {stats.wins}/{stats.trades} | 손실합계: {stats.stop_loss_total:+.2f} USDT",
+        ]
+        fetch_positions = getattr(self.exchange, "fetch_positions", None)
+        if callable(fetch_positions):
+            position_lines = []
+            for symbol in self.config.symbols:
+                for raw in fetch_positions(symbol):
+                    size = float(raw.get("size") or 0)
+                    if size <= 0:
+                        continue
+                    unreal = float(raw.get("unrealisedPnl") or raw.get("unrealizedPnl") or 0)
+                    value = float(raw.get("positionValue") or 0)
+                    upct = (unreal / value * 100) if value else 0.0
+                    side = "LONG" if int(raw.get("positionIdx") or 0) == 1 or str(raw.get("side")).lower() == "buy" else "SHORT"
+                    position_lines.append(f"{symbol} {side} 수량 {size:g} | 미실현 {unreal:+.2f} USDT ({upct:+.1f}%)")
+            if position_lines:
+                lines.append("실제 포지션:\n" + "\n".join(position_lines))
+        return "\n".join(lines)
 
     def maybe_send_hourly_report(self, now: datetime | None = None) -> bool:
         if not self.config.hourly_report:
@@ -256,6 +396,21 @@ class TradingBot:
             self._notify_safe(self.build_hourly_report())
             return True
         return False
+
+    def maybe_send_daily_weekly_reports(self, now: datetime | None = None) -> int:
+        now = now or datetime.now(timezone.utc)
+        sent = 0
+        # Send once near UTC midnight; loop interval can be >60s, so accept first 5 minutes.
+        if now.hour == 0 and now.minute < 5 and self._last_daily_report_date != now.date():
+            self._notify_safe(self.build_daily_report())
+            self._last_daily_report_date = now.date()
+            sent += 1
+        week_key = now.isocalendar()[:2]
+        if now.weekday() == 0 and now.hour == 0 and now.minute < 5 and self._last_weekly_report_key != week_key:
+            self._notify_safe(self.build_weekly_report())
+            self._last_weekly_report_key = week_key
+            sent += 1
+        return sent
 
     def setup_telegram_commands(self) -> bool:
         if isinstance(self.notifier, TelegramNotifier):
@@ -290,6 +445,12 @@ class TradingBot:
             elif command in ("/status", "status", "상태", "리포트"):
                 self._notify_safe(self.build_hourly_report())
                 handled += 1
+            elif command in ("/daily", "daily", "일간", "오늘"):
+                self._notify_safe(self.build_daily_report())
+                handled += 1
+            elif command in ("/weekly", "weekly", "주간", "이번주"):
+                self._notify_safe(self.build_weekly_report())
+                handled += 1
         if self._telegram_update_offset is not None:
             self._telegram_offset_path.parent.mkdir(parents=True, exist_ok=True)
             self._telegram_offset_path.write_text(str(self._telegram_update_offset))
@@ -304,8 +465,11 @@ class TradingBot:
         while True:
             try:
                 self.process_telegram_commands_once()
+                self.poll_trade_monitoring()
                 self.run_once()
+                self.poll_trade_monitoring()
                 self.maybe_send_hourly_report()
+                self.maybe_send_daily_weekly_reports()
             except Exception as exc:
                 self._notify_error(exc)
             time_module.sleep(self.config.loop_interval_sec)

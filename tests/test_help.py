@@ -17,8 +17,10 @@ class HelpTests(unittest.TestCase):
         text = telegram_help()
         self.assertIn("/help", text)
         self.assertIn("/status", text)
+        self.assertIn("/daily", text)
+        self.assertIn("/weekly", text)
         self.assertIn("주문 실행 명령을 받지 않습니다", text)
-        self.assertEqual({c["command"] for c in TELEGRAM_BOT_COMMANDS}, {"help", "status"})
+        self.assertEqual({c["command"] for c in TELEGRAM_BOT_COMMANDS}, {"help", "status", "daily", "weekly"})
 
 
 if __name__ == "__main__":

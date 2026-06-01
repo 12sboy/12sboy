@@ -14,6 +14,12 @@ def command_help() -> str:
   python3 -m trading_bot report --config config.yaml
     현재 BTC/ETH 시장상황, 잔고, 포지션 요약 리포트를 출력하고 텔레그램 설정이 있으면 알림으로 보냅니다.
 
+  python3 -m trading_bot daily --config config.yaml
+    오늘 실현 손익, 승률, 손실합계, 롱/숏 거래 수를 출력합니다.
+
+  python3 -m trading_bot weekly --config config.yaml
+    이번 주 실현 손익, 승률, 손실합계, 롱/숏 거래 수를 출력합니다.
+
   python3 -m trading_bot once --config config.yaml
     최신 5분봉 기준으로 BTC/ETH를 한 번 평가합니다.
     mode: demo 상태에서는 조건이 맞으면 Bybit Demo Trading 주문이 생성될 수 있습니다.
@@ -55,6 +61,8 @@ def telegram_help() -> str:
 텔레그램 명령어:
 /help - 이 도움말 보기
 /status - 현재 BTC/ETH 시장상황, 잔고, 포지션 리포트 받기
+/daily - 오늘 일간 손익 리포트 받기
+/weekly - 이번 주 손익 리포트 받기
 
 현재 봇 설정:
 - Bybit Demo Trading 모드
@@ -70,11 +78,13 @@ Termux 실행 명령어:
 cd /data/data/com.termux/files/home/work/bot
 python3 -m trading_bot run --config config.yaml
 
-주의: 텔레그램에서는 안전을 위해 주문 실행 명령을 받지 않습니다. /status와 /help만 처리합니다.
+주의: 텔레그램에서는 안전을 위해 주문 실행 명령을 받지 않습니다. /status, /daily, /weekly, /help만 처리합니다.
 """
 
 
 TELEGRAM_BOT_COMMANDS = [
     {"command": "help", "description": "매매봇 도움말 보기"},
     {"command": "status", "description": "시장상황/잔고/포지션 리포트"},
+    {"command": "daily", "description": "오늘 일간 손익 리포트"},
+    {"command": "weekly", "description": "이번 주 손익 리포트"},
 ]

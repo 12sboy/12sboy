@@ -11,7 +11,7 @@ from .help import command_help
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="PBInvesting-style Bybit BTC/ETH trading bot")
-    parser.add_argument("command", choices=["help", "once", "backtest", "report", "telegram-poll", "run"], help="help: show commands; once: evaluate latest candles; backtest: public Bybit historical sample; report: send/print hourly report; telegram-poll: process Telegram commands once; run: continuous loop")
+    parser.add_argument("command", choices=["help", "once", "backtest", "report", "daily", "weekly", "telegram-poll", "run"], help="help: show commands; once: evaluate latest candles; backtest: public Bybit historical sample; report: send/print hourly report; daily/weekly: PnL reports; telegram-poll: process Telegram commands once; run: continuous loop")
     parser.add_argument("--config", default="config.yaml")
     parser.add_argument("--output", default=None)
     args = parser.parse_args()
@@ -26,6 +26,10 @@ def main() -> int:
         result = run_backtest_from_public(config)
     elif args.command == "report":
         result = TradingBot(config).build_hourly_report()
+    elif args.command == "daily":
+        result = TradingBot(config).build_daily_report()
+    elif args.command == "weekly":
+        result = TradingBot(config).build_weekly_report()
     elif args.command == "telegram-poll":
         bot = TradingBot(config)
         bot.setup_telegram_commands()
