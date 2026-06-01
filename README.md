@@ -105,6 +105,112 @@ A+ 셋업:
 python3 -m trading_bot report --config config.yaml
 ```
 
+## 독립형 텔레그램 모니터링 모듈
+
+요구사항용 전체 모듈은 `trading_bot/telegram_monitor.py`에 있습니다. 기존 자동매매 엔진과 분리해서 사용할 수 있는 이벤트 콜백형 모듈입니다.
+
+### 제공 기능
+
+- 진입 알림: 방향, 진입가, 물량, 레버리지, 초 단위 시간, 주문ID
+- 청산 알림: 방향, 진입가/청산가, 실현손익 USDT/% 기준, 손절 여부
+- 손절 특별 경고: `⚠️ 손절 실행!` 및 손실 금액 강조
+- 시간 리포트: 1시간 OHLC, 추세, 잔고, 미실현 손익, 보유 포지션, 해당 시간 실현손익
+- 일간 리포트: 당일 PnL, 최대 손실폭, 승률, 롱/숏 거래 수, 손절 손실 총합
+- 주간 리포트: 주간 PnL, 수익률, 최대 자본 인하율, 통계, 다음 주 관심 지표
+- 명령어: `/status`, `/daily`, `/weekly`, `/help`
+- 텔레그램 API rate limit 보호: 큐 기반 전송 + 최대 초당 30개 이하 제한
+- 1초 내 동일 타입 알림 병합 옵션
+- 예외 발생 시 텔레그램 오류 알림
+
+### 설치
+
+```bash
+pip install -r requirements.txt
+```
+
+`python-telegram-bot>=20`이 필요합니다. 단, 로컬 시뮬레이션과 단위 테스트는 콘솔 클라이언트를 사용하므로 실제 텔레그램 토큰 없이도 실행됩니다.
+
+### 환경 변수
+
+```bash
+TELEGRAM_BOT_TOKEN=123456:ABCDEF
+TELEGRAM_CHAT_ID=123456789
+TELEGRAM_PARSE_MODE=HTML
+TELEGRAM_RATE_LIMIT_PER_SEC=25
+TELEGRAM_MERGE_WINDOW_SEC=1
+```
+
+### 기존 자동매매봇 통합 예시
+
+```python
+from trading_bot.telegram_monitor import (
+    TelegramMonitoringModule,
+    TradeEntryEvent,
+    TradeExitEvent,
+)
+
+monitor = TelegramMonitoringModule(provider=my_report_provider)
+await monitor.start()
+
+# 진입 체결/주문 콜백에서 호출
+await monitor.notify_entry(TradeEntryEvent(
+    symbol="BTC/USDT",
+    direction="LONG",
+    entry_price=65200,
+    quantity=0.05,
+    quantity_unit="BTC",
+    leverage=10,
+    order_id="exchange-order-id",
+))
+
+# 청산 체결 콜백에서 호출
+await monitor.notify_exit(TradeExitEvent(
+    symbol="BTC/USDT",
+    direction="LONG",
+    entry_price=65200,
+    exit_price=66100,
+    quantity=0.05,
+    realized_pnl_usdt=450,
+    realized_pnl_pct=6.9,
+    is_stop_loss=False,
+))
+```
+
+`/status`, `/daily`, `/weekly`, 시간/일간/주간 리포트를 쓰려면 `ReportDataProvider` 프로토콜을 구현해야 합니다.
+
+```python
+class MyReportProvider:
+    async def account_snapshot(self): ...
+    async def market_snapshots_1h(self): ...
+    async def realized_pnl_since(self, since): ...
+    async def daily_summary(self, day=None): ...
+    async def weekly_summary(self, week_start=None): ...
+```
+
+명령어 봇을 별도 프로세스로 띄우려면:
+
+```python
+app = monitor.build_application()
+app.run_polling()
+```
+
+자동매매 루프 내부에서 스케줄러를 쓸 경우:
+
+```python
+asyncio.create_task(monitor.run_schedulers())
+```
+
+APScheduler를 이미 쓰고 있다면 `send_hourly_report`, `send_daily_report`, `send_weekly_report`를 원하는 cron에 등록하면 됩니다.
+
+### 로컬 테스트/가상 거래 시뮬레이션
+
+```bash
+python3 scripts/simulate_telegram_monitor.py
+cat reports/telegram_monitor_demo.txt
+```
+
+이 스크립트는 실제 텔레그램으로 보내지 않고 콘솔/파일에 메시지를 출력합니다.
+
 ## 텔레그램 명령어
 
 `run` 모드로 봇이 실행 중이면 텔레그램 채팅에서 아래 명령어를 사용할 수 있습니다.
@@ -140,5 +246,7 @@ python3 -m trading_bot telegram-poll --config config.yaml
 ## 주의
 
 - 데모트레이딩이라도 실제 주문 API를 호출합니다. 반드시 `mode: paper`에서 먼저 테스트하세요.
+- API 키, 토큰 등 민감 정보는 코드에 하드코딩하지 말고 `.env` 또는 배포 환경 변수로만 주입하세요.
+- 텔레그램 채널에 보내려면 봇을 채널 관리자로 추가하고 `TELEGRAM_CHAT_ID`를 채널 ID로 설정하세요.
 - Bybit 계정 포지션 모드, 레버리지, 최소 주문 수량/호가 단위는 계정 설정에 따라 주문 거절이 발생할 수 있습니다.
 - 현재 봇은 프로세스 메모리에 포지션을 저장합니다. 장기 운영 전에는 DB/파일 상태 저장 기능을 추가하는 것이 좋습니다.
