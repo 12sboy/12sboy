@@ -36,13 +36,23 @@ def market_snapshot(candles: list[Candle], vwap: float | None = None, ema8: floa
 def format_trade_message(event: dict) -> str:
     signal = event.get("signal", {})
     order = event.get("order", {})
+    order_type = order.get("orderType") or order.get("type") or "unknown"
+    reduce_only = bool(order.get("reduceOnly") or order.get("reduce_only"))
+    is_market_close = reduce_only and str(order_type).lower() == "market"
+    title = "청산 시장가 주문 전송" if is_market_close else "진입 지정가 주문 접수"
+    fill_note = "체결 가능성 높음: Bybit execution으로 별도 확인" if is_market_close else "아직 미체결일 수 있음: Bybit open order/execution 기준 확인"
+    status = order.get("orderStatus") or "Submitted"
     return (
-        f"체결/주문 알림\n"
+        f"{title}\n"
         f"심볼: {event.get('symbol')}\n"
         f"액션: {signal.get('action')} {signal.get('side') or ''}\n"
         f"사유: {signal.get('reason')}\n"
-        f"가격: {signal.get('price')}\n"
+        f"신호가격: {signal.get('price')}\n"
+        f"주문가격: {order.get('price')}\n"
         f"수량: {order.get('qty')}\n"
+        f"주문유형: {order_type}\n"
+        f"상태: {status}\n"
+        f"체결확인: {fill_note}\n"
         f"주문ID: {order.get('orderId') or order.get('id')}"
     )
 

@@ -6,6 +6,8 @@ import hmac
 import json
 import os
 import time
+import socket
+import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
@@ -51,7 +53,7 @@ class BybitPublicClient:
         bybit_symbol = normalize_bybit_symbol(symbol)
         params = urllib.parse.urlencode({"category": "linear", "symbol": bybit_symbol, "interval": interval, "limit": str(limit)})
         url = f"{self.base_url}/v5/market/kline?{params}"
-        with urllib.request.urlopen(url, timeout=20) as response:
+        with _urlopen_with_retry(url, timeout=20) as response:
             payload = json.loads(response.read().decode("utf-8"))
         if payload.get("retCode") != 0:
             raise RuntimeError(f"Bybit API error: {payload}")
@@ -102,7 +104,7 @@ class BybitDemoClient(BybitPublicClient):
             return self.clock()
         if self._server_time_offset_ms is None:
             request = urllib.request.Request(f"{self.base_url}/v5/market/time", method="GET")
-            with urllib.request.urlopen(request, timeout=20) as response:
+            with _urlopen_with_retry(request, timeout=20) as response:
                 result = json.loads(response.read().decode("utf-8"))
             if result.get("retCode") == 0:
                 server_ms = int(result.get("time") or int(result["result"]["timeSecond"]) * 1000)
@@ -139,7 +141,7 @@ class BybitDemoClient(BybitPublicClient):
                 }
             )
         request = urllib.request.Request(url, data=data, headers=headers, method=method)
-        with urllib.request.urlopen(request, timeout=20) as response:
+        with _urlopen_with_retry(request, timeout=20) as response:
             result = json.loads(response.read().decode("utf-8"))
         accepted = {0, *(ok_ret_codes or set())}
         if int(result.get("retCode", -1)) not in accepted:
@@ -209,6 +211,7 @@ class BybitDemoClient(BybitPublicClient):
             result.setdefault("side", side)
             result.setdefault("orderType", order_type)
             result.setdefault("positionIdx", body.get("positionIdx"))
+            result.setdefault("reduceOnly", bool(reduce_only))
         return result
 
     def set_leverage(self, symbol: str, leverage: float) -> dict:
@@ -234,6 +237,16 @@ class BybitDemoClient(BybitPublicClient):
         response = self._request("GET", "/v5/order/realtime", query=query, private=True)
         return response.get("result", {}).get("list", [])
 
+    def fetch_executions(self, symbol: str, limit: int = 10) -> list[dict]:
+        query = urllib.parse.urlencode({"category": "linear", "symbol": normalize_bybit_symbol(symbol), "limit": str(limit)})
+        response = self._request("GET", "/v5/execution/list", query=query, private=True)
+        return response.get("result", {}).get("list", [])
+
+    def fetch_closed_pnl(self, symbol: str, limit: int = 10) -> list[dict]:
+        query = urllib.parse.urlencode({"category": "linear", "symbol": normalize_bybit_symbol(symbol), "limit": str(limit)})
+        response = self._request("GET", "/v5/position/closed-pnl", query=query, private=True)
+        return response.get("result", {}).get("list", [])
+
     def cancel_all_orders(self, symbol: str) -> dict:
         body = {"category": "linear", "symbol": normalize_bybit_symbol(symbol)}
         response = self._request("POST", "/v5/order/cancel-all", body=body, private=True, ok_ret_codes={110001})
@@ -255,6 +268,28 @@ class BybitDemoClient(BybitPublicClient):
 
 def _fmt(value: float) -> str:
     return _fmt_decimal(Decimal(str(value)))
+
+
+def _is_transient_network_error(exc: BaseException) -> bool:
+    if isinstance(exc, (TimeoutError, socket.timeout, urllib.error.URLError)):
+        return True
+    reason = getattr(exc, "reason", None)
+    return isinstance(reason, (TimeoutError, socket.timeout, OSError))
+
+
+def _urlopen_with_retry(request, timeout: int = 20, attempts: int = 3):
+    last_exc: BaseException | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            return urllib.request.urlopen(request, timeout=timeout)
+        except Exception as exc:
+            if not _is_transient_network_error(exc) or attempt >= attempts:
+                raise
+            last_exc = exc
+            time.sleep(min(2 ** (attempt - 1), 5))
+    if last_exc:
+        raise last_exc
+    raise RuntimeError("urlopen retry failed unexpectedly")
 
 
 def _floor_to_step(value: Decimal, step: Decimal) -> Decimal:

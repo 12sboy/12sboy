@@ -2,7 +2,7 @@ import unittest
 from datetime import datetime, timezone
 
 from trading_bot.core import Candle
-from trading_bot.reporting import classify_market, format_hourly_report
+from trading_bot.reporting import classify_market, format_hourly_report, format_trade_message
 
 
 def c(ts, close):
@@ -25,6 +25,25 @@ class ReportingTests(unittest.TestCase):
         self.assertIn("BTC/USDT: 상승", text)
         self.assertIn("USDT equity: 123.45", text)
         self.assertIn("BTC/USDT=LONG", text)
+
+    def test_trade_message_distinguishes_entry_order_from_fill(self):
+        text = format_trade_message({
+            "symbol": "ETH/USDT",
+            "signal": {"action": "SELL", "side": "SHORT", "reason": "breakdown", "price": 2009.8},
+            "order": {"orderId": "abc", "qty": "0.45", "price": "2009.87", "orderType": "Limit", "reduceOnly": False},
+        })
+        self.assertIn("진입 지정가 주문 접수", text)
+        self.assertIn("아직 미체결일 수 있음", text)
+        self.assertIn("수량: 0.45", text)
+
+    def test_trade_message_marks_market_close_as_close_order(self):
+        text = format_trade_message({
+            "symbol": "BTC/USDT",
+            "signal": {"action": "CLOSE", "side": "SHORT", "reason": "fixed_take_profit", "price": 73542.6},
+            "order": {"orderId": "def", "qty": "0.025", "price": "73542.6", "orderType": "Market", "reduceOnly": True},
+        })
+        self.assertIn("청산 시장가 주문 전송", text)
+        self.assertIn("Bybit execution", text)
 
 
 if __name__ == "__main__":

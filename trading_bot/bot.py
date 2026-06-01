@@ -11,7 +11,7 @@ import yaml
 
 from .backtest import BacktestEngine
 from .core import PBInvestingStrategy, Position, StrategyConfig
-from .exchange import load_exchange
+from .exchange import _is_transient_network_error, load_exchange
 from .help import TELEGRAM_BOT_COMMANDS, telegram_help
 from .notifier import Notifier, TelegramNotifier, make_notifier
 from .reporting import format_hourly_report, format_trade_message, market_snapshot
@@ -85,6 +85,8 @@ class TradingBot:
         self._telegram_update_offset: int | None = None
         self._telegram_offset_path = Path("reports/telegram_update_offset.txt")
         self._last_entry_candle: dict[str, tuple[datetime, str, str | None]] = {}
+        self._last_error_notice_at: datetime | None = None
+        self._last_error_notice_text: str | None = None
 
     def _notify_safe(self, text: str) -> bool:
         try:
@@ -93,6 +95,24 @@ class TradingBot:
         except Exception as exc:
             print(f"notification failed: {type(exc).__name__}: {exc}", flush=True)
             return False
+
+    def _notify_error(self, exc: Exception) -> None:
+        now = datetime.now(timezone.utc)
+        if _is_transient_network_error(exc):
+            text = f"네트워크 일시 오류: {type(exc).__name__}: {exc} — 자동 재시도/다음 루프 계속"
+            # DNS/timeout glitches can happen on Termux mobile networks. Log every
+            # occurrence locally but do not spam Telegram more than once per hour.
+            print(text, flush=True)
+            if self._last_error_notice_at and now - self._last_error_notice_at < timedelta(hours=1):
+                return
+        else:
+            text = f"봇 오류: {type(exc).__name__}: {exc}"
+            if self._last_error_notice_text == text and self._last_error_notice_at and now - self._last_error_notice_at < timedelta(minutes=10):
+                print(text, flush=True)
+                return
+        if self._notify_safe(text):
+            self._last_error_notice_at = now
+            self._last_error_notice_text = text
 
     def _sync_exchange_position(self, symbol: str) -> Position | None:
         fetch_positions = getattr(self.exchange, "fetch_positions", None)
@@ -183,18 +203,19 @@ class TradingBot:
                         self.positions.pop(symbol, None)
                 continue
 
+            open_orders = self._fetch_open_orders(symbol)
+            if open_orders and self._cancel_stale_open_orders(symbol, open_orders):
+                open_orders = []
+
             signal = self.strategy.on_candle(candles, symbol, levels)
             if signal.action in ("BUY", "SELL") and signal.side:
                 signature = (cur.timestamp, signal.action, signal.side)
                 if self._last_entry_candle.get(symbol) == signature:
                     events.append({"symbol": symbol, "signal": asdict(signal), "skipped": "duplicate_closed_candle_signal", "levels": levels})
                     continue
-                open_orders = self._fetch_open_orders(symbol)
                 if open_orders:
-                    cancelled = self._cancel_stale_open_orders(symbol, open_orders)
-                    if cancelled == 0:
-                        events.append({"symbol": symbol, "signal": asdict(signal), "skipped": "open_order_pending", "open_orders": open_orders, "levels": levels})
-                        continue
+                    events.append({"symbol": symbol, "signal": asdict(signal), "skipped": "open_order_pending", "open_orders": open_orders, "levels": levels})
+                    continue
                 entry = signal.price or cur.close
                 stop = cur.vwap or entry
                 qty = calculate_order_qty(self.config.equity_usdt, entry, stop if stop != entry else cur.low, self.config.risk) * signal.position_size_multiplier
@@ -286,7 +307,7 @@ class TradingBot:
                 self.run_once()
                 self.maybe_send_hourly_report()
             except Exception as exc:
-                self._notify_safe(f"봇 오류: {type(exc).__name__}: {exc}")
+                self._notify_error(exc)
             time_module.sleep(self.config.loop_interval_sec)
 
 
