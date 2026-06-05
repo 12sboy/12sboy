@@ -328,7 +328,11 @@ class TradingBot:
                     continue
                 entry = signal.price or cur.close
                 stop = cur.vwap or entry
-                qty = calculate_order_qty(self.config.equity_usdt, entry, stop if stop != entry else cur.low, self.config.risk) * signal.position_size_multiplier
+                if stop == entry:
+                    stop = cur.low if signal.side == "LONG" else cur.high
+                qty = calculate_order_qty(self.config.equity_usdt, entry, stop, self.config.risk) * signal.position_size_multiplier
+                if self.config.risk.max_order_notional_usdt and self.config.risk.max_order_notional_usdt > 0:
+                    qty = min(qty, self.config.risk.max_order_notional_usdt / entry)
                 if qty > 0:
                     order = self.exchange.place_order(symbol, "Buy" if signal.side == "LONG" else "Sell", qty, order_type=self.config.order_type, price=entry)
                     self._record_order_intent(symbol, order, "entry", signal.side, signal.reason, entry)

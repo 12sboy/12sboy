@@ -48,6 +48,12 @@ class StrategyConfig:
     take_profit_fraction: float = 0.5
     fixed_take_profit_pct: float | None = 0.0025
     require_candle_direction: bool = True
+    require_momentum_1h: bool = False
+    require_ema_vwap_alignment: bool = False
+    setup_max_age_bars: int = 12
+    min_breakout_pct: float = 0.0
+    max_close_vwap_distance_pct: float = 0.0
+    trade_start_hour_utc: int = 0
 
 
 @dataclass(frozen=True)
@@ -115,28 +121,68 @@ class PBInvestingStrategy:
             return Signal("HOLD", symbol, reason="missing_levels")
 
         # ``on_candle`` may be called statelessly with the full candle window
-        # (backtests/tests) or incrementally live. Reconstruct earlier breakout
-        # state from the supplied window, then include the newest transition.
+        # (backtests/tests) or incrementally live. Reconstruct the most recent
+        # breakout/breakdown index so stale all-day setups do not fire in chop.
         long_setup_seen = symbol in self._long_breakout_seen
         short_setup_seen = symbol in self._short_breakdown_seen
-        for older, newer in zip(enriched[:-2], enriched[1:-1]):
-            if older.close <= pre_high < newer.close:
+        long_setup_idx: int | None = None
+        short_setup_idx: int | None = None
+        min_breakout = self.config.min_breakout_pct
+        for idx, (older, newer) in enumerate(zip(enriched[:-2], enriched[1:-1]), start=1):
+            if older.close <= pre_high and newer.close > pre_high * (1 + min_breakout):
                 long_setup_seen = True
-            if older.close >= pre_low > newer.close:
+                long_setup_idx = idx
+            if older.close >= pre_low and newer.close < pre_low * (1 - min_breakout):
                 short_setup_seen = True
-        if prev.close <= pre_high < cur.close:
+                short_setup_idx = idx
+        cur_idx = len(enriched) - 1
+        if prev.close <= pre_high and cur.close > pre_high * (1 + min_breakout):
             long_setup_seen = True
+            long_setup_idx = cur_idx
             self._long_breakout_seen.add(symbol)
-        if prev.close >= pre_low > cur.close:
+        if prev.close >= pre_low and cur.close < pre_low * (1 - min_breakout):
             short_setup_seen = True
+            short_setup_idx = cur_idx
             self._short_breakdown_seen.add(symbol)
+
+        max_age = max(int(self.config.setup_max_age_bars), 1)
+        long_expired = long_setup_seen and long_setup_idx is not None and cur_idx - long_setup_idx > max_age
+        short_expired = short_setup_seen and short_setup_idx is not None and cur_idx - short_setup_idx > max_age
+        if long_expired:
+            long_setup_seen = False
+            self._long_breakout_seen.discard(symbol)
+        if short_expired:
+            short_setup_seen = False
+            self._short_breakdown_seen.discard(symbol)
+        expired_setup = long_expired or short_expired
+
+        if cur.timestamp.hour < self.config.trade_start_hour_utc:
+            return Signal("HOLD", symbol, reason="before_trade_start_hour", meta={"vwap": cur.vwap, "ema8": cur.ema8})
 
         touches_vwap = cur.low <= cur.vwap * (1 + self.config.retest_tolerance_pct) and cur.high >= cur.vwap * (1 - self.config.retest_tolerance_pct)
 
+        if expired_setup and touches_vwap:
+            return Signal("HOLD", symbol, reason="setup_expired", meta={"vwap": cur.vwap, "ema8": cur.ema8})
+
+        if self.config.max_close_vwap_distance_pct and abs(cur.close - cur.vwap) / cur.vwap > self.config.max_close_vwap_distance_pct:
+            if touches_vwap:
+                return Signal("HOLD", symbol, reason="close_too_far_from_vwap", meta={"vwap": cur.vwap, "ema8": cur.ema8})
+
         long_candle_ok = not self.config.require_candle_direction or cur.close > cur.open
         short_candle_ok = not self.config.require_candle_direction or cur.close < cur.open
+        momentum_close = enriched[-13].close if len(enriched) >= 13 else None
+        long_momentum_ok = not self.config.require_momentum_1h or (momentum_close is not None and cur.close > momentum_close)
+        short_momentum_ok = not self.config.require_momentum_1h or (momentum_close is not None and cur.close < momentum_close)
+        long_ema_ok = not self.config.require_ema_vwap_alignment or (cur.ema8 is not None and cur.ema8 >= cur.vwap)
+        short_ema_ok = not self.config.require_ema_vwap_alignment or (cur.ema8 is not None and cur.ema8 <= cur.vwap)
 
-        if long_setup_seen and cur.close >= cur.vwap and touches_vwap and long_candle_ok:
+        if (long_setup_seen or short_setup_seen) and touches_vwap:
+            if (long_setup_seen and not long_momentum_ok) or (short_setup_seen and not short_momentum_ok):
+                return Signal("HOLD", symbol, reason="momentum_filter", meta={"vwap": cur.vwap, "ema8": cur.ema8})
+            if (long_setup_seen and not long_ema_ok) or (short_setup_seen and not short_ema_ok):
+                return Signal("HOLD", symbol, reason="ema_vwap_alignment_filter", meta={"vwap": cur.vwap, "ema8": cur.ema8})
+
+        if long_setup_seen and cur.close >= cur.vwap and touches_vwap and long_candle_ok and long_momentum_ok and long_ema_ok:
             a_plus = self._is_a_plus(cur.vwap, levels)
             self._long_breakout_seen.discard(symbol)
             return Signal(
@@ -150,7 +196,7 @@ class PBInvestingStrategy:
                 meta={"vwap": cur.vwap, "ema8": cur.ema8, "levels": levels},
             )
 
-        if short_setup_seen and cur.close <= cur.vwap and touches_vwap and short_candle_ok:
+        if short_setup_seen and cur.close <= cur.vwap and touches_vwap and short_candle_ok and short_momentum_ok and short_ema_ok:
             a_plus = self._is_a_plus(cur.vwap, levels)
             self._short_breakdown_seen.discard(symbol)
             return Signal(

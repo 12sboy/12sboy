@@ -109,6 +109,42 @@ class PBInvestingStrategyTests(unittest.TestCase):
         self.assertEqual(signal.reason, "fixed_take_profit")
         self.assertAlmostEqual(signal.qty_fraction, 1.0)
 
+    def test_retest_signal_expires_after_configured_bars(self):
+        strategy = PBInvestingStrategy(StrategyConfig(retest_tolerance_pct=0.02, setup_max_age_bars=2, require_candle_direction=False))
+        candles = [
+            c("2026-01-01T00:00:00", 100, 101, 99, 100, 100),
+            c("2026-01-01T00:05:00", 100, 106, 100, 105, 200),  # breakout
+            c("2026-01-01T00:10:00", 105, 106, 104, 105, 100),
+            c("2026-01-01T00:15:00", 105, 106, 104, 105, 100),
+            c("2026-01-01T00:20:00", 105, 106, 100, 102, 100),  # stale VWAP retest
+        ]
+        signal = strategy.on_candle(candles, "BTC/USDT", {"pre_high": 103, "pre_low": 95, "prior_high": 110, "prior_low": 90})
+        self.assertEqual(signal.action, "HOLD")
+        self.assertEqual(signal.reason, "setup_expired")
+
+    def test_momentum_filter_blocks_counter_trend_long_retest(self):
+        strategy = PBInvestingStrategy(StrategyConfig(retest_tolerance_pct=0.2, require_momentum_1h=True, require_candle_direction=False))
+        candles = [c("2026-01-01T00:00:00", 110, 111, 109, 110, 100)]
+        candles += [c(f"2026-01-01T00:{i*5:02d}:00", 100, 101, 99, 100, 100) for i in range(1, 11)]
+        candles += [
+            c("2026-01-01T00:55:00", 100, 106, 99, 105, 200),  # breakout but below 1h-ago close 110
+            c("2026-01-01T01:00:00", 105, 106, 100, 102, 100),
+        ]
+        signal = strategy.on_candle(candles, "BTC/USDT", {"pre_high": 103, "pre_low": 95, "prior_high": 120, "prior_low": 90})
+        self.assertEqual(signal.action, "HOLD")
+        self.assertEqual(signal.reason, "momentum_filter")
+
+    def test_ema_vwap_alignment_filter_blocks_short_when_ema_above_vwap(self):
+        strategy = PBInvestingStrategy(StrategyConfig(retest_tolerance_pct=0.2, require_ema_vwap_alignment=True, require_candle_direction=False))
+        candles = [
+            c("2026-01-01T00:00:00", 120, 121, 20, 120, 300),
+            c("2026-01-01T00:05:00", 100, 100, 94, 95, 10),
+            c("2026-01-01T00:10:00", 90, 90, 80, 90, 10),
+        ]
+        signal = strategy.on_candle(candles, "BTC/USDT", {"pre_high": 130, "pre_low": 97, "prior_high": 130, "prior_low": 70})
+        self.assertEqual(signal.action, "HOLD")
+        self.assertEqual(signal.reason, "ema_vwap_alignment_filter")
+
 
 if __name__ == "__main__":
     unittest.main()
