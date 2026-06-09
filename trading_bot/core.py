@@ -83,6 +83,7 @@ class PBInvestingStrategy:
         self.config = config or StrategyConfig()
         self._long_breakout_seen: set[str] = set()
         self._short_breakdown_seen: set[str] = set()
+        self._consumed_setup_ids: set[tuple[str, str, str]] = set()
 
     def compute_indicators(self, candles: list[Candle]) -> list[EnrichedCandle]:
         if not candles:
@@ -127,23 +128,35 @@ class PBInvestingStrategy:
         short_setup_seen = symbol in self._short_breakdown_seen
         long_setup_idx: int | None = None
         short_setup_idx: int | None = None
+        long_setup_id: tuple[str, str, str] | None = None
+        short_setup_id: tuple[str, str, str] | None = None
         min_breakout = self.config.min_breakout_pct
         for idx, (older, newer) in enumerate(zip(enriched[:-2], enriched[1:-1]), start=1):
+            candidate_id = (symbol, "LONG", newer.timestamp.isoformat())
             if older.close <= pre_high and newer.close > pre_high * (1 + min_breakout):
-                long_setup_seen = True
+                long_setup_seen = candidate_id not in self._consumed_setup_ids
                 long_setup_idx = idx
+                long_setup_id = candidate_id
+            candidate_id = (symbol, "SHORT", newer.timestamp.isoformat())
             if older.close >= pre_low and newer.close < pre_low * (1 - min_breakout):
-                short_setup_seen = True
+                short_setup_seen = candidate_id not in self._consumed_setup_ids
                 short_setup_idx = idx
+                short_setup_id = candidate_id
         cur_idx = len(enriched) - 1
+        current_long_id = (symbol, "LONG", cur.timestamp.isoformat())
         if prev.close <= pre_high and cur.close > pre_high * (1 + min_breakout):
-            long_setup_seen = True
+            long_setup_seen = current_long_id not in self._consumed_setup_ids
             long_setup_idx = cur_idx
-            self._long_breakout_seen.add(symbol)
+            long_setup_id = current_long_id
+            if long_setup_seen:
+                self._long_breakout_seen.add(symbol)
+        current_short_id = (symbol, "SHORT", cur.timestamp.isoformat())
         if prev.close >= pre_low and cur.close < pre_low * (1 - min_breakout):
-            short_setup_seen = True
+            short_setup_seen = current_short_id not in self._consumed_setup_ids
             short_setup_idx = cur_idx
-            self._short_breakdown_seen.add(symbol)
+            short_setup_id = current_short_id
+            if short_setup_seen:
+                self._short_breakdown_seen.add(symbol)
 
         max_age = max(int(self.config.setup_max_age_bars), 1)
         long_expired = long_setup_seen and long_setup_idx is not None and cur_idx - long_setup_idx > max_age
@@ -163,6 +176,8 @@ class PBInvestingStrategy:
 
         if expired_setup and touches_vwap:
             return Signal("HOLD", symbol, reason="setup_expired", meta={"vwap": cur.vwap, "ema8": cur.ema8})
+        if touches_vwap and ((long_setup_id and long_setup_id in self._consumed_setup_ids) or (short_setup_id and short_setup_id in self._consumed_setup_ids)):
+            return Signal("HOLD", symbol, reason="setup_consumed", meta={"vwap": cur.vwap, "ema8": cur.ema8})
 
         if self.config.max_close_vwap_distance_pct and abs(cur.close - cur.vwap) / cur.vwap > self.config.max_close_vwap_distance_pct:
             if touches_vwap:
@@ -185,6 +200,8 @@ class PBInvestingStrategy:
         if long_setup_seen and cur.close >= cur.vwap and touches_vwap and long_candle_ok and long_momentum_ok and long_ema_ok:
             a_plus = self._is_a_plus(cur.vwap, levels)
             self._long_breakout_seen.discard(symbol)
+            if long_setup_id:
+                self._consumed_setup_ids.add(long_setup_id)
             return Signal(
                 "BUY",
                 symbol,
@@ -199,6 +216,8 @@ class PBInvestingStrategy:
         if short_setup_seen and cur.close <= cur.vwap and touches_vwap and short_candle_ok and short_momentum_ok and short_ema_ok:
             a_plus = self._is_a_plus(cur.vwap, levels)
             self._short_breakdown_seen.discard(symbol)
+            if short_setup_id:
+                self._consumed_setup_ids.add(short_setup_id)
             return Signal(
                 "SELL",
                 symbol,

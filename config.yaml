@@ -24,7 +24,7 @@ strategy:
   fixed_take_profit_pct: 0.0025
   require_candle_direction: true
   require_momentum_1h: false
-  require_ema_vwap_alignment: false
+  require_ema_vwap_alignment: true
   setup_max_age_bars: 48
   min_breakout_pct: 0.0005
   max_close_vwap_distance_pct: 0.0

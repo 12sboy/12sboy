@@ -109,6 +109,21 @@ class PBInvestingStrategyTests(unittest.TestCase):
         self.assertEqual(signal.reason, "fixed_take_profit")
         self.assertAlmostEqual(signal.qty_fraction, 1.0)
 
+    def test_consumed_breakout_setup_does_not_signal_again_on_same_candles(self):
+        strategy = PBInvestingStrategy(StrategyConfig(retest_tolerance_pct=0.002, require_candle_direction=False))
+        candles = [
+            c("2026-01-01T00:00:00", 100, 101, 99, 100, 100),
+            c("2026-01-01T00:05:00", 100, 101, 99, 100, 100),
+            c("2026-01-01T00:10:00", 100, 105, 100, 104, 200),
+            c("2026-01-01T00:15:00", 104, 105, 100.2, 102, 100),
+        ]
+        levels = {"pre_high": 103, "pre_low": 95, "prior_high": 110, "prior_low": 101.7}
+        first = strategy.on_candle(candles, symbol="BTC/USDT", levels=levels)
+        second = strategy.on_candle(candles, symbol="BTC/USDT", levels=levels)
+        self.assertEqual(first.action, "BUY")
+        self.assertEqual(second.action, "HOLD")
+        self.assertEqual(second.reason, "setup_consumed")
+
     def test_retest_signal_expires_after_configured_bars(self):
         strategy = PBInvestingStrategy(StrategyConfig(retest_tolerance_pct=0.02, setup_max_age_bars=2, require_candle_direction=False))
         candles = [
