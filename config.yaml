@@ -5,7 +5,7 @@ symbols:
   - BTC/USDT
   - ETH/USDT
 timeframe: 5m
-equity_usdt: 1000
+equity_usdt: 10000
 order_type: Limit
 loop_interval_sec: 60
 hourly_report: true
@@ -34,4 +34,4 @@ risk:
   max_notional_pct: 0.15
   min_qty: 0.0
   leverage: 5
-  max_order_notional_usdt: 1000
+  max_order_notional_usdt: 10000
